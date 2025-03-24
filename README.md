@@ -1,7 +1,7 @@
 Tasks app
 # Task Manager App
 
-This is a full-stack task management application with a **React frontend** and a **Node.js backend** using MongoDB for data storage.
+This is a full-stack task web management application with a **React frontend** and a **Node.js backend** using MongoDB for data storage.
 
 ## Prerequisites
 Ensure you have the following installed:
