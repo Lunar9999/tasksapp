@@ -17,17 +17,30 @@ const App: React.FC = () => {
   const modal = useAppSelector((state) => state.modal);
   const tasks = useAppSelector((state) => state.tasks.tasks);
   const dispatch = useAppDispatch();
-  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem("token"));
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    const checkAuth = () => {
-      setIsAuthenticated(!!localStorage.getItem("token"));
+    const checkAuth = async () => {
+      try {
+        const response = await fetch("http://localhost:10000/api/auth/check", {
+          credentials: "include",
+        });
+        if (response.ok) {
+          setIsAuthenticated(true);
+          console.log("User is authenticated");
+        } else {
+          setIsAuthenticated(false);
+          console.log("User is not authenticated");
+        }
+      } catch (error) {
+        console.error("Authentication check failed, setting as not authenticated", error);
+        setIsAuthenticated(false);
+      }
     };
-
-    window.addEventListener("storage", checkAuth);
-    return () => window.removeEventListener("storage", checkAuth);
+  
+    checkAuth();
   }, []);
-
+  
   useEffect(() => {
     if (isAuthenticated) {
       dispatch(tasksActions.fetchTasks());
@@ -38,9 +51,29 @@ const App: React.FC = () => {
     dispatch(modalActions.closeModalCreateTask());
   };
 
-  const createNewTaskHandler = (task: Task) => {
-    dispatch(tasksActions.addNewTask(task));
+  const createNewTaskHandler = async (task: Task) => {
+    try {
+      if (!task.title) {
+        task.title = "Untitled Task";
+      }
+      if (!task.description) {
+        task.description = "No description provided";
+      }
+      if (!task.date) {
+        const currentDate = new Date().toISOString().split("T")[0];
+        task.date = currentDate;
+      }
+  
+      // Await the task creation and state update
+      await dispatch(tasksActions.addNewTask(task)).unwrap();
+      await dispatch(tasksActions.fetchTasks()); // Refresh task list after addition
+  
+      console.log("Task added successfully", task);
+    } catch (error) {
+      console.error("Failed to add task", error);
+    }
   };
+  
 
   return (
     <Routes>
@@ -54,8 +87,7 @@ const App: React.FC = () => {
       <Route
         path="/login"
         element={
-          isAuthenticated ? <Navigate to="/tasks" replace /> : <Login />
-        }
+          isAuthenticated ? <Navigate to="/tasks" replace /> : <Login setIsAuthenticated={setIsAuthenticated} />        }
       />
 
       <Route

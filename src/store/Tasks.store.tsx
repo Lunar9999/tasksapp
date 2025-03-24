@@ -3,12 +3,8 @@ import { Task } from "../interfaces";
 
 // Fetch Tasks
 export const fetchTasks = createAsyncThunk("tasks/fetchTasks", async () => {
-  const token = localStorage.getItem("token"); // Retrieve token from localStorage
   const response = await fetch("http://localhost:10000/api/tasks", {
     credentials: "include",
-    headers: {
-      "Authorization": `Bearer ${token}`, // Include token
-    },
   });
   if (!response.ok) {
     throw new Error("Failed to fetch tasks");
@@ -18,13 +14,11 @@ export const fetchTasks = createAsyncThunk("tasks/fetchTasks", async () => {
 
 // Add Task
 export const addNewTask = createAsyncThunk("tasks/addNewTask", async (task: Task) => {
-  const token = localStorage.getItem("token");  
   const response = await fetch("http://localhost:10000/api/tasks", {
     method: "POST",
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`,
     },
     body: JSON.stringify(task),
   });
@@ -40,29 +34,22 @@ export const addNewTask = createAsyncThunk("tasks/addNewTask", async (task: Task
   return data;
 });
 
-
 // Remove Task
 export const removeTask = createAsyncThunk("tasks/removeTask", async (taskId: string) => {
-  const token = localStorage.getItem("token");
   await fetch(`http://localhost:10000/api/tasks/${taskId}`, {
     method: "DELETE",
     credentials: "include",
-    headers: {
-      "Authorization": `Bearer ${token}`,
-    },
   });
   return taskId;
 });
 
 // Edit Task
 export const editTask = createAsyncThunk("tasks/editTask", async (task: Task) => {
-  const token = localStorage.getItem("token");
   await fetch(`http://localhost:10000/api/tasks/${task.id}`, {
     method: "PUT",
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`,
     },
     body: JSON.stringify(task),
   });
@@ -71,17 +58,12 @@ export const editTask = createAsyncThunk("tasks/editTask", async (task: Task) =>
 
 // Delete All Tasks
 export const deleteAllData = createAsyncThunk("tasks/deleteAllData", async () => {
-  const token = localStorage.getItem("token");
   await fetch("http://localhost:10000/api/tasks", {
     method: "DELETE",
     credentials: "include",
-    headers: {
-      "Authorization": `Bearer ${token}`,
-    },
   });
   return true;
 });
-
 
 const initialState: {
   tasks: Task[];

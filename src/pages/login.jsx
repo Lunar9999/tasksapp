@@ -2,7 +2,7 @@ import { useState } from "react";
 import axios from "axios";
 import { useNavigate, Link } from "react-router-dom";
 
-export default function Login() {
+export default function Login({ setIsAuthenticated }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -13,22 +13,29 @@ export default function Login() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError("");
 
     try {
-      const { data } = await axios.post(
-        "http://localhost:10000/api/auth/login",
-        { email, password },
-        { withCredentials: true }
-      );
+      const response = await fetch("http://localhost:10000/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",  // ✅ Important for cookies
+        body: JSON.stringify({ email, password }),
+      });
 
-      localStorage.setItem("token", data.token);
-      axios.defaults.headers.common["Authorization"] = `Bearer ${data.token}`;
-
-      window.dispatchEvent(new Event("storage"));
-      navigate("/tasks");
-    } catch (err) {
-      setError(err.response?.data?.error || "Login failed. Please try again.");
+      if (response.ok) {
+        setIsAuthenticated(true);  // ✅ Update state to indicate login
+        navigate("/tasks");        // ✅ Redirect to the dashboard
+      } else {
+        const errorData = await response.json();
+        setError(`Login failed: ${errorData.error}`);
+        setIsAuthenticated(false);  // ✅ Explicitly mark as not authenticated
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      setError("An unexpected error occurred. Please try again.");
+      setIsAuthenticated(false);  // ✅ Explicitly mark as not authenticated
     } finally {
       setLoading(false);
     }
@@ -36,7 +43,7 @@ export default function Login() {
 
   return (
     <div className="p-6 max-w-md mx-auto bg-white shadow-lg rounded-lg">
-      <h2 className="text-2xl font-bold text-center mb-6">Logon</h2>
+      <h2 className="text-2xl font-bold text-center mb-6">Login</h2>
 
       <form onSubmit={handleLogin} className="space-y-4">
         <div>

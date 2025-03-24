@@ -47,25 +47,26 @@ const ModalCreateTask: React.FC<{
   const isTitleValid = useRef(false);
   const isDateValid = useRef(false);
 
-  const addNewTaskHandler = (event: React.FormEvent): void => {
+  const addNewTaskHandler = async (event: React.FormEvent): Promise<void> => {
     event.preventDefault();
-
+  
     isTitleValid.current = title.trim().length > 0;
     isDateValid.current = date.trim().length > 0;
-
+  
     if (isTitleValid.current && isDateValid.current) {
+      const isoDate = new Date(date).toISOString().split("T")[0];
       const newTask: Task = {
-        title,
+        title: title || "Untitled Task",
         dir: selectedDirectory,
-        description,
-        date,
+        description: description || "No description provided",
+        date: isoDate,
         completed: isCompleted,
         important: isImportant,
         id: task?.id || Date.now().toString(),
         userid: task?.id || Date.now().toString(),
       };
       console.log("Task being sent:", newTask);
-      onConfirm(newTask);
+      await onConfirm(newTask);
       onClose();
     } else {
       console.warn("Invalid task submission: Title or Date is missing");

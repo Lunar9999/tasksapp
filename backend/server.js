@@ -19,23 +19,13 @@ const allowedOrigins = [
 ];
 
 // ✅ CORS Middleware
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-  }
-  res.setHeader("Access-Control-Allow-Methods", "GET,HEAD,PUT,PATCH,POST,DELETE");
-  res.setHeader("Access-Control-Allow-Headers", "Origin,X-Requested-With,Content-Type,Accept,Authorization");
-  res.setHeader("Access-Control-Allow-Credentials", "true");
-  res.setHeader("Access-Control-Max-Age", "86400"); // Cache preflight response for 24h
-
-  // ✅ Handle preflight requests
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(204); // No Content
-  }
-
-  next();
-});
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true,  // ✅ Allow sending credentials like cookies
+  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",  // ✅ Allowed methods
+  allowedHeaders: "Origin,X-Requested-With,Content-Type,Accept,Authorization",  // ✅ Allowed headers
+  maxAge: 86400,  // ✅ Cache preflight response for 24 hours
+}));
 
 app.use(express.json()); // Ensure JSON body is parsed properly
 app.use(cookieParser());
@@ -129,30 +119,53 @@ app.post("/api/auth/login", async (req, res) => {
     if (!user) return res.status(400).json({ error: "User not found" });
 
     const valid = await bcrypt.compare(password, user.password);
-    if (!valid) return res.status(401).json({ error: "Invalid credentials" });
+    if (!valid) return res.status(401).json({ error: "I.nvalid credentials" });
 
     const token = jwt.sign({ userId: user._id }, SECRET, { expiresIn: "1h" });
 
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: true, // Ensure secure cookie in production
-      sameSite: "None", // Required for cross-origin cookies
-    }).json({ message: "Logged in", token });
-
+// ✅ Set the cookie in the login route
+res.cookie("token", token, {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",  // Use secure only in production
+  sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+}).json({ message: "Logged in", token });
+    
   } catch (err) {
     console.error("Login Error:", err);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
+// Auth Check Route
+// Auth Check Route
+app.get("/api/auth/check", (req, res) => {
+  const token = req.cookies.token;
+  if (!token) {
+    console.log("No token found");
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  jwt.verify(token, SECRET, (err, decoded) => {
+    if (err) {
+      console.error("Invalid token:", err);
+      return res.status(403).json({ error: "Invalid token" });
+    }
+    console.log("Authenticated user:", decoded.userId);
+    res.json({ authenticated: true });
+  });
+});
+
+
 // ✅ Logout
+// Logout Route
 app.post("/api/auth/logout", (req, res) => {
   res.clearCookie("token", {
     httpOnly: true,
-    secure: true,
-    sameSite: "None",
-  }).json({ message: "Logged out" });
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+  }).json({ message: "Logged out successfully" });
 });
+
 
 // ✅ Get User's Tasks
 app.get("/api/tasks", authMiddleware, async (req, res) => {
@@ -166,39 +179,46 @@ app.get("/api/tasks", authMiddleware, async (req, res) => {
 });
 
 // ✅ Add Task
+// ✅ Add Task
 app.post("/api/tasks", authMiddleware, async (req, res) => {
   try {
-    const { title, description, date } = req.body; // ✅ Extract date from req.body
+    const { title, description, date } = req.body;
+
     if (!title || !description || !date) {
       return res.status(400).json({ error: "Title, description, and date are required" });
     }
 
-    const task = new Task({ userId: req.user.userId, title, description, date }); // ✅ Use the extracted date
+    // Log the incoming date for debugging
+    console.log("Received date:", date);
+
+    // Create a Date object to ensure it is valid and adjusted correctly
+    const taskDate = new Date(date);
+    const formattedDate = new Date(taskDate.getTime() + Math.abs(taskDate.getTimezoneOffset() * 60000));
+
+    // Log the final formatted date
+    console.log("Formatted date for database:", formattedDate);
+
+    const task = new Task({ userId: req.user.userId, title, description, date: formattedDate });
     await task.save();
 
-    // Fetch user's email
+    // ✅ Send email notification
     const user = await User.findById(req.user.userId);
-    
-    if (user) {
-      // Email Content
-      const mailOptions = {
-        from: process.env.EMAIL_USER,
-        to: user.email,
-        subject: "New Task Created",
-        text: `Your task "${title}" has been added successfully!\n\nDescription: ${description}`,
-      };
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: `${user.email}, evanjoroge3@gmail.com,x2023fft@stfx.ca`, 
+      subject: "New Task Added",
+      text: `A new task has been added:\n\nTitle: ${title}\nDescription: ${description}\nDue Date: ${formattedDate.toISOString().split('T')[0]}`,
+    };
 
-      // Send Email
-      transporter.sendMail(mailOptions, (error, info) => {
-        if (error) {
-          console.error("Email sending error:", error);
-        } else {
-          console.log("Email sent:", info.response);
-        }
-      });
-    }
+    transporter.sendMail(mailOptions, (error, info) => {
+      if (error) {
+        console.error("Email sending error:", error);
+      } else {
+        console.log("Email sent:", info.response);
+      }
+    });
 
-    res.json({ message: "Task created and email sent!", task });
+    res.json({ message: "Task created successfully", task });
   } catch (err) {
     console.error("Error adding task:", err);
     res.status(500).json({ error: "Internal Server Error" });
@@ -207,6 +227,7 @@ app.post("/api/tasks", authMiddleware, async (req, res) => {
 
 
 // ✅ Send Email Alerts for Unfinished Tasks
+// ✅ Send Email Alerts for Unfinished Tasks (Scheduled after 5 minutes)
 app.post("/send-alert", authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId);
@@ -216,25 +237,33 @@ app.post("/send-alert", authMiddleware, async (req, res) => {
       return res.status(400).json({ error: "No unfinished tasks to remind about" });
     }
 
+    const recipients = ["Evanjoroge33@gmail.com", "x2023fft@stfx.ca"];
     const mailOptions = {
       from: process.env.EMAIL_USER,
-      to: user.email,
-      subject: "Unfinished Tasks Alert",
-      text: `You have the following unfinished tasks: ${tasks.map(task => task.title).join(", ")}`,
+      to: recipients,
+      subject: "Tasks Alert (Scheduled)",
+      text: `Reminder from Task Planner: You have unfinished tasks:\n\n${tasks.map(task => `- ${task.title}`).join("\n")}`,
     };
 
-    transporter.sendMail(mailOptions, (error, info) => {
-      if (error) {
-        console.error("Email sending error:", error);
-        return res.status(500).send(error.toString());
-      }
-      res.status(200).send("Email sent: " + info.response);
-    });
+    // ✅ Schedule the email to be sent after 5 minutes (300000 ms)
+    setTimeout(() => {
+      transporter.sendMail(mailOptions, (error, info) => {
+        if (error) {
+          console.error("Scheduled Email Sending Error:", error);
+        } else {
+          console.log("Scheduled Email Sent:", info.response);
+        }
+      });
+    }, 300000); // 5 minutes delay
+
+    res.status(200).json({ message: "Email alert scheduled in 5 minutes" });
+
   } catch (err) {
     console.error("Send Alert Error:", err);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
+
 
 // ✅ Start Server
 const PORT = process.env.PORT || 10000;

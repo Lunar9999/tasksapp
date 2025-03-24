@@ -28,14 +28,14 @@ const Notification: React.FC = () => {
   const moreTasksToShow = uncompletedTasks.length > tasksToShow.length;
   return (
     <div className="sm:mr-4 md:mr-6 ml-auto grid place-items-center relative">
-      <button
+    { /*<button
         ref={refBtnNotification}
         onClick={showNotifications}
         className={`relative ${tasksToShow.length ? classHasNotification : ""}`}
         title="see notifications"
       >
         <IconBell className="fill-violet-600 w-5 h-5 md:w-6 md:h-6 dark:fill-violet-800" />
-      </button>
+      </button>*/}
       {notificationIsVisible && (
         <div className="absolute bg-slate-100 dark:bg-slate-800 top-full rounded-md right-0 p-3 w-52 border border-slate-300 dark:border-slate-700">
           {uncompletedTasks.length > 0 ? (
